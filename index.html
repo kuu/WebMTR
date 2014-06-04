@@ -10,17 +10,16 @@
   </head>
   <body>
     <div>
-      <button>Record</button>
+      <p><label>Volume<input type="range"></label></p>
+      <p><button>Record</button></p>
     </div>
     <script src="vendor/recorder.js"></script>
     <script>
-      var audioContext, recorder;
+      var audioContext, recorder, gain;
 
-      document.addEventListener('DOMContentLoaded', function () {
-        initGlobal();
-        initDOM();
-        initAudio();
-      }, false);
+      initGlobal();
+      initDOM();
+      initAudio();
 
       function initGlobal() {
         window.AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -33,6 +32,10 @@
         button.addEventListener('click', function (e) {
           record(button);
         }, false);
+        var range = document.getElementsByTagName('input')[0];
+        range.addEventListener('change', function () {
+          gain.gain.value = range.value * 2 / 100;
+        }, false); 
       }
 
       function initAudio() {
@@ -48,11 +51,13 @@
       }
 
       function initRecorder(stream) {
-        var input = audioContext.createMediaStreamSource(stream);
-        var gain = audioContext.createGain();
-        gain.gain.value = 1;
-        input.connect(gain);
+        // Build audio graph
+        var mediaStreamSource = audioContext.createMediaStreamSource(stream);
+        var monoStreamSource = convertToMono(mediaStreamSource);
+        gain = audioContext.createGain();
+        monoStreamSource.connect(gain);
         gain.connect(audioContext.destination);
+        gain.gain.value = 0.5;
         recorder = new Recorder(gain);
         console.log('Recorder set up.');
       }
@@ -68,6 +73,17 @@
           console.log('Stopped recording.');
           recorder.clear();
         }
+      }
+
+      function convertToMono(input) {
+	      // make sure the source is mono - some sources will be left-side only
+        var splitter = audioContext.createChannelSplitter(2);
+        var merger = audioContext.createChannelMerger(2);
+
+        input.connect(splitter);
+        splitter.connect(merger, 0, 0);
+        splitter.connect(merger, 0, 1);
+        return merger;
       }
     </script>
   </body>
