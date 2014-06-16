@@ -16,7 +16,7 @@
         sampleRate: this.context.sampleRate
       }
     });
-    var recording = false;
+    var recording = false, callback = null;
 
     this.node.onaudioprocess = function(e){
       if (!recording) return;
@@ -34,9 +34,16 @@
       recording = false;
     }
 
-    this.clear = function(){
+    this.clear = function(cb){
+      callback = cb;
       worker.postMessage({ command: 'clear' });
     }
+
+    worker.onmessage = function (e) {
+      if (callback) {
+        callback(e.data);
+      }
+    };
 
     source.connect(this.node);
     this.node.connect(this.context.destination);    //this should not be necessary

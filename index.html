@@ -13,9 +13,14 @@
       <p><label>Volume<input type="range"></label></p>
       <p><button>Record</button></p>
     </div>
+    <div>
+      <div id="list">
+      </div>
+      <button id="mix">Mix</button>
+    </div>
     <script src="vendor/recorder.js"></script>
     <script>
-      var audioContext, recorder, gain;
+      var audioContext, recorder, gain, list, mix;
 
       initGlobal();
       initDOM();
@@ -36,6 +41,12 @@
         range.addEventListener('change', function () {
           gain.gain.value = range.value * 2 / 100;
         }, false); 
+        list = document.getElementById('list');
+        updateList();
+        mix = document.getElementById('mix');
+        mix.addEventListener('click', function () {
+          doMix();
+        }, false);
       }
 
       function initAudio() {
@@ -71,7 +82,12 @@
           recorder && recorder.stop();
           button.innerHTML = 'Record';
           console.log('Stopped recording.');
-          recorder.clear();
+          recorder.clear(function (result) {
+            console.log(result);
+            if (result === 'success') {
+              updateList();
+            }
+          });
         }
       }
 
@@ -84,6 +100,45 @@
         splitter.connect(merger, 0, 0);
         splitter.connect(merger, 0, 1);
         return merger;
+      }
+
+      function updateList() {
+        function handler() {
+          if(this.readyState == this.DONE) {
+            if(this.status == 200 &&
+              this.response != null) {
+              // success!
+              var arr = JSON.parse(this.response), str = '', value;
+              for (var i = 0, il = arr.length; i < il; i++) {
+                value = arr[i];
+                str += '<label><input type="checkbox" name="item" value="' + value + '">' + value + '</label><br>';
+              }
+              list.innerHTML = str;
+            }
+          }
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = handler;
+        xhr.open("GET", "list");
+        xhr.send();
+      }
+
+      function doMix() {
+        var tList = document.getElementsByName("item"), arr = [];
+        for (var i = 0, il = tList.length; i < il; i++) {
+          if (tList[i].checked) {
+            arr.push(tList[i].value);
+          }
+        }
+        if (arr.length < 2) {
+          alert('Choose more than two items.');
+        } else {
+          var xhr = new XMLHttpRequest();
+          xhr.open("POST", "/mix");
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.send(JSON.stringify({mix: arr}));
+        }
       }
     </script>
   </body>

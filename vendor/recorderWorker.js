@@ -18,10 +18,15 @@ function init(config) {
   socket.emit('metadata', {
     sampleRate:config.sampleRate 
   });
+  var tSelf = this;
+  socket.on('result', function (e) {
+console.log('Message from sock: ', e);
+    tSelf.postMessage(e);
+  });
 }
 
 function record(inputBuffer) {
-  // Float32Array -> Int16Array
+  // Float32Array -> Int8Array
   var sampleNum = inputBuffer.length;
   var buffer = new ArrayBuffer(sampleNum * 2);
   var view = new DataView(buffer);
@@ -35,6 +40,5 @@ function record(inputBuffer) {
 }
 
 function clear() {
-  socket.emit('flush', {
-  });
+  socket.emit('flush', {});
 }

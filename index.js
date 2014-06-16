@@ -3,12 +3,46 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var fs = require('fs');
-var sampleRate;
+var bodyParser = require('body-parser');
+var sampleRate, audioDir = './audio/', fileId = 0;
 
 app.use(express.static(__dirname));
+app.use(bodyParser());
 
 app.get('/', function (req, res) {
   res.sendfile('index.html');
+});
+
+app.get('/list', function (req, res) {
+  var allFiles = fs.readdirSync(audioDir), file, list = [];
+  for (var i = 0, il = allFiles.length; i < il; i++) {
+    file = allFiles[i];
+    if (file.indexOf('.wav', file.length - 4) !== -1) {
+      list.push(file);
+    }
+  }
+  res.json(list);
+});
+
+app.post('/mix', function (req, res) {
+  var args = req.body.mix || [];
+  if (args.length < 2) {
+    res.redirect('/');
+    return;
+  }
+
+  for (var i = 0, il = args.length; i < il; i++) {
+    args[i] = audioDir + args[i];
+  }
+  args.unshift('-m');
+  args.push(audioDir + 'beketa-' + (fileId++) + '.wav');
+
+  var spawn = require('child_process').spawn;
+  var sox    = spawn('sox', args);
+  sox.on('close', function(code) {
+    console.log('[from sox] : child process exited with code ' + code);
+    res.redirect('/');
+  });
 });
 
 var buffer = new Buffer(0);
@@ -28,12 +62,14 @@ io.on('connection', function (socket) {
   });
   socket.on('flush', function (msg) {
     var wavFile = Buffer.concat([createWaveHeader(), buffer]);
-    fs.writeFile('test.wav', wavFile, null, function (err) {
+    fs.writeFile(audioDir + 'beketa-' + (fileId++) + '.wav', wavFile, null, function (err) {
       if (err) {
         console.error(err);
+        socket.send('result', {data: 'error'});
       } else {
         console.log("The file was saved!");
         buffer.length = 0;
+        socket.send('reuslt', {data: 'success'});
       }
     });
   });
