@@ -71,12 +71,15 @@
         var deleteButton = document.getElementById('delete');
         deleteButton.addEventListener('click', function () {
           player && player.removeAll();
-          recorder && recorder.removeAll(getSelectedItem(), function (result) {
-            console.log(result);
-            if (result === 'success') {
-              updateList();
-            }
-          });
+          var items = getSelectedItem();
+          if (recorder && items && items.length > 0) {
+            recorder.removeAll(items, function (result) {
+              console.log(result);
+              if (result === 'success') {
+                updateList();
+              }
+            });
+          }
         }, false);
       }
 
