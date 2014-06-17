@@ -10,17 +10,21 @@
   </head>
   <body>
     <div>
-      <p><label>Volume<input type="range"></label></p>
-      <p><button>Record</button></p>
+      <p><label>Volume (Recording) <input type="range" id="recordingVolume"></label></p>
+      <p><button id="recordBtn">Record</button></p>
     </div>
     <div>
+      <p><label>Volume (Playback) <input type="range" id="playbackVolume"></label></p>
       <div id="list">
       </div>
       <button id="mix">Mix</button>
+      <button id="play">Play</button>
+      <button id="delete">Delete</button>
     </div>
-    <script src="vendor/recorder.js"></script>
+    <script src="recorder.js"></script>
+    <script src="player.js"></script>
     <script>
-      var audioContext, recorder, gain, list, mix;
+      var audioContext, recorder, recorderGain, player, playerGain, list, recorderButton;
 
       initGlobal();
       initDOM();
@@ -33,19 +37,46 @@
       }
 
       function initDOM() {
-        var button = document.getElementsByTagName('button')[0];
-        button.addEventListener('click', function (e) {
-          record(button);
+        recorderButton = document.getElementById('recordBtn');
+        recorderButton.addEventListener('click', function (e) {
+          record(recorderButton);
         }, false);
-        var range = document.getElementsByTagName('input')[0];
-        range.addEventListener('change', function () {
-          gain.gain.value = range.value * 2 / 100;
+        var recordingVolume = document.getElementById('recordingVolume');
+        recordingVolume.addEventListener('change', function () {
+          recorderGain.gain.value = recordingVolume.value * 2 / 100;
+        }, false); 
+        var playbackVolume = document.getElementById('playbackVolume');
+        playbackVolume.addEventListener('change', function () {
+          playerGain.gain.value = playbackVolume.value * 2 / 100;
         }, false); 
         list = document.getElementById('list');
         updateList();
-        mix = document.getElementById('mix');
-        mix.addEventListener('click', function () {
+        var mixButton = document.getElementById('mix');
+        mixButton.addEventListener('click', function () {
           doMix();
+        }, false);
+        var playButton = document.getElementById('play');
+        playButton.addEventListener('click', function () {
+          if (player) {
+            var items = getSelectedItem();
+            playButton.disabled = true;
+            player.update(items).then(function () {
+              player.play(items);
+              playButton.disabled = false;
+            }, function () {
+              playButton.disabled = false;
+            });
+          }
+        }, false);
+        var deleteButton = document.getElementById('delete');
+        deleteButton.addEventListener('click', function () {
+          player && player.removeAll();
+          recorder && recorder.removeAll(getSelectedItem(), function (result) {
+            console.log(result);
+            if (result === 'success') {
+              updateList();
+            }
+          });
         }, false);
       }
 
@@ -59,26 +90,36 @@
         navigator.getUserMedia({audio: true}, initRecorder, function(e) {
           console.error('No live audio input: ' + e);
         });
+        initPlayer();
+      }
+
+      function initPlayer() {
+        playerGain = audioContext.createGain();
+        playerGain.connect(audioContext.destination);
+        playerGain.gain.value = 0.5;
+        player = new Player(playerGain);
       }
 
       function initRecorder(stream) {
         // Build audio graph
         var mediaStreamSource = audioContext.createMediaStreamSource(stream);
         var monoStreamSource = convertToMono(mediaStreamSource);
-        gain = audioContext.createGain();
-        monoStreamSource.connect(gain);
-        gain.connect(audioContext.destination);
-        gain.gain.value = 0.5;
-        recorder = new Recorder(gain);
+        recorderGain = audioContext.createGain();
+        monoStreamSource.connect(recorderGain);
+        recorderGain.connect(audioContext.destination);
+        recorderGain.gain.value = 0.5;
+        recorder = new Recorder(recorderGain);
         console.log('Recorder set up.');
       }
 
       function record(button) {
         if (button.innerHTML === 'Record') {
+          player && player.play(getSelectedItem());
           recorder && recorder.record();
           button.innerHTML = 'Stop';
           console.log('Recording...');
         } else {
+          player && player.stop();
           recorder && recorder.stop();
           button.innerHTML = 'Record';
           console.log('Stopped recording.');
@@ -114,6 +155,12 @@
                 str += '<label><input type="checkbox" name="item" value="' + value + '">' + value + '</label><br>';
               }
               list.innerHTML = str;
+              player.update(arr).then(function () {
+                recorderButton.disable = false;
+              }, function () {
+                recorderButton.disable = false;
+              });
+              recorderButton.disable = true;
             }
           }
         }
@@ -124,17 +171,36 @@
         xhr.send();
       }
 
-      function doMix() {
+      function getSelectedItem() {
         var tList = document.getElementsByName("item"), arr = [];
         for (var i = 0, il = tList.length; i < il; i++) {
           if (tList[i].checked) {
             arr.push(tList[i].value);
           }
         }
+        return arr;
+      }
+
+      function doMix() {
+        function handler() {
+          if (this.readyState == this.DONE) {
+            if (this.status == 200 && this.response) {
+              var response = JSON.parse(this.response);
+              if (response.result === 'success') {
+                updateList();
+                return;
+              }
+            }
+            alert('Something bad happened in mixing.');
+          }
+        }
+
+        var arr = getSelectedItem();
         if (arr.length < 2) {
           alert('Choose more than two items.');
         } else {
           var xhr = new XMLHttpRequest();
+          xhr.onreadystatechange = handler;
           xhr.open("POST", "/mix");
           xhr.setRequestHeader("Content-Type", "application/json");
           xhr.send(JSON.stringify({mix: arr}));

@@ -13,6 +13,12 @@ app.get('/', function (req, res) {
   res.sendfile('index.html');
 });
 
+app.get('/audio/:id', function (req, res) {
+  var id = req.params.id;
+  res.type('audio/wave');
+  res.sendfile(audioDir + id);
+});
+
 app.get('/list', function (req, res) {
   var allFiles = fs.readdirSync(audioDir), file, list = [];
   for (var i = 0, il = allFiles.length; i < il; i++) {
@@ -41,7 +47,12 @@ app.post('/mix', function (req, res) {
   var sox    = spawn('sox', args);
   sox.on('close', function(code) {
     console.log('[from sox] : child process exited with code ' + code);
-    res.redirect('/');
+    //res.redirect(303, '/');
+    if (code) {
+      res.json({result: 'failed'});
+    } else {
+      res.json({result: 'success'});
+    }
   });
 });
 
@@ -58,20 +69,35 @@ io.on('connection', function (socket) {
   socket.on('record', function (msg) {
     var buf = msg.data;
     buffer = Buffer.concat([buffer, buf]);
-    console.log(buffer.length);
+    //console.log(buffer.length);
   });
-  socket.on('flush', function (msg) {
+  socket.on('flush', function (msg, callback) {
+    console.log("Received 'flush' message");
     var wavFile = Buffer.concat([createWaveHeader(), buffer]);
-    fs.writeFile(audioDir + 'beketa-' + (fileId++) + '.wav', wavFile, null, function (err) {
+    var fileName = audioDir + 'beketa-' + (fileId++) + '.wav';
+    //var err = fs.writeFileSync(fileName, wavFile, null);
+    fs.writeFile(fileName, wavFile, null, function (err) {
       if (err) {
         console.error(err);
-        socket.send('result', {data: 'error'});
+        callback('error');
       } else {
-        console.log("The file was saved!");
+        console.log("The file was saved as ", fileName);
         buffer.length = 0;
-        socket.send('reuslt', {data: 'success'});
+        callback('success');
       }
     });
+    socket.emit('reuslt', {data: 'success'});
+  });
+  socket.on('delete', function (msg, callback) {
+    console.log("Received 'delete' message");
+    var list = msg.list, err, result = true;
+    for (var i = 0, il = list.length; i < il; i++) {
+      err = fs.unlinkSync(audioDir + list[i]);
+      if (err) {
+        result = false;
+      }
+    }
+    callback(result ? 'success' : 'error');
   });
 });
 

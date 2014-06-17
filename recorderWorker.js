@@ -10,6 +10,8 @@ this.onmessage = function (e) {
     record(e.data.buffer);
   } else if (command === 'clear') {
     clear();
+  } else if (command === 'removeAll') {
+    removeAll(e.data.list);
   }
 };
 
@@ -17,11 +19,6 @@ function init(config) {
   socket = io();
   socket.emit('metadata', {
     sampleRate:config.sampleRate 
-  });
-  var tSelf = this;
-  socket.on('result', function (e) {
-console.log('Message from sock: ', e);
-    tSelf.postMessage(e);
   });
 }
 
@@ -40,5 +37,15 @@ function record(inputBuffer) {
 }
 
 function clear() {
-  socket.emit('flush', {});
+  var tSelf = this;
+  socket.emit('flush', {}, function (result) {
+    tSelf.postMessage(result);
+  });
+}
+
+function removeAll(list) {
+  var tSelf = this;
+  socket.emit('delete', {list: list}, function (result) {
+    tSelf.postMessage(result);
+  });
 }

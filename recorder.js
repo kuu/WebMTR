@@ -1,21 +1,24 @@
-(function(window){
+(function () {
 
-  var WORKER_PATH = 'vendor/recorderWorker.js';
+  var WORKER_PATH = 'recorderWorker.js';
 
-  var Recorder = function(source, cfg){
+  var Recorder = function (source, cfg) {
     var config = cfg || {};
     var bufferLen = config.bufferLen || 4096;
     this.context = source.context;
     this.node = (this.context.createScriptProcessor ||
                  this.context.createJavaScriptNode).call(this.context,
                                                          bufferLen, 1, 1);
+
     var worker = new Worker(config.workerPath || WORKER_PATH);
+
     worker.postMessage({
       command: 'init',
       config: {
         sampleRate: this.context.sampleRate
       }
     });
+
     var recording = false, callback = null;
 
     this.node.onaudioprocess = function(e){
@@ -39,9 +42,18 @@
       worker.postMessage({ command: 'clear' });
     }
 
+    this.removeAll = function(list, cb){
+      callback = cb;
+      worker.postMessage({
+        command: 'removeAll',
+        list: list
+      });
+    }
+
     worker.onmessage = function (e) {
       if (callback) {
         callback(e.data);
+        callback = null;
       }
     };
 
@@ -51,4 +63,4 @@
 
   window.Recorder = Recorder;
 
-})(window);
+}());
