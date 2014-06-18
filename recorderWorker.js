@@ -8,10 +8,12 @@ this.onmessage = function (e) {
     init(e.data.config);
   } else if (command === 'record') {
     record(e.data.buffer);
+  } else if (command === 'save') {
+    save();
   } else if (command === 'clear') {
-    clear();
-  } else if (command === 'removeAll') {
-    removeAll(e.data.list);
+    clear(e.data.list);
+  } else if (command === 'disconnect') {
+    disconnect();
   }
 };
 
@@ -23,7 +25,7 @@ function init(config) {
 }
 
 function record(inputBuffer) {
-  // Float32Array -> Int8Array
+  // Float32 (-1.0 <-> +1.0) -> Int16 (-0x8000 <-> +0x7FFF)
   var sampleNum = inputBuffer.length;
   var buffer = new ArrayBuffer(sampleNum * 2);
   var view = new DataView(buffer);
@@ -32,20 +34,24 @@ function record(inputBuffer) {
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
   }
   socket.emit('record', {
-    data: view.buffer
+    data: buffer
   });
 }
 
-function clear() {
+function save() {
   var tSelf = this;
   socket.emit('flush', {}, function (result) {
     tSelf.postMessage(result);
   });
 }
 
-function removeAll(list) {
+function clear(list) {
   var tSelf = this;
   socket.emit('delete', {list: list}, function (result) {
     tSelf.postMessage(result);
   });
+}
+
+function disconnect() {
+  socket.disconnect();
 }

@@ -66,7 +66,7 @@
     }
   };
 
-  Player.prototype.removeAll = function () {
+  Player.prototype.clear = function () {
     this.elements = {};
   };
 

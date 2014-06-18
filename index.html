@@ -10,13 +10,14 @@
   </head>
   <body>
     <div>
+      <label>Available audio inputs:<select id="microphones" size="1"></select></label>
+    </div>
+    <div>
       <p><label>Volume (Recording) <input type="range" id="recordingVolume"></label></p>
       <p><button id="recordBtn">Record</button></p>
     </div>
     <div>
-      <p><label>Volume (Playback) <input type="range" id="playbackVolume"></label></p>
-      <div id="list">
-      </div>
+      <div id="list"></div>
       <button id="mix">Mix</button>
       <button id="play">Play</button>
       <button id="delete">Delete</button>
@@ -24,7 +25,7 @@
     <script src="recorder.js"></script>
     <script src="player.js"></script>
     <script>
-      var audioContext, recorder, recorderGain, player, playerGain, list, recorderButton;
+      var audioContext, recorder, inputStream, recorderGain, player, list, recorderButton;
 
       initGlobal();
       initDOM();
@@ -44,10 +45,6 @@
         var recordingVolume = document.getElementById('recordingVolume');
         recordingVolume.addEventListener('change', function () {
           recorderGain.gain.value = recordingVolume.value * 2 / 100;
-        }, false); 
-        var playbackVolume = document.getElementById('playbackVolume');
-        playbackVolume.addEventListener('change', function () {
-          playerGain.gain.value = playbackVolume.value * 2 / 100;
         }, false); 
         list = document.getElementById('list');
         updateList();
@@ -70,10 +67,10 @@
         }, false);
         var deleteButton = document.getElementById('delete');
         deleteButton.addEventListener('click', function () {
-          player && player.removeAll();
+          player && player.clear();
           var items = getSelectedItem();
           if (recorder && items && items.length > 0) {
-            recorder.removeAll(items, function (result) {
+            recorder.clear(items, function (result) {
               console.log(result);
               if (result === 'success') {
                 updateList();
@@ -84,33 +81,65 @@
       }
 
       function initAudio() {
+
+        // Init Web Audio
         try {
           audioContext = new AudioContext;
           console.log('Audio context set up.');
         } catch (e) {
-          console.error('No web audio support in this browser!');
+          throw new Error('No web audio support in this browser!');
         }
-        navigator.getUserMedia({audio: true}, initRecorder, function(e) {
-          console.error('No live audio input: ' + e);
+
+        // Init microphone input
+        var microphones = document.getElementById('microphones');
+        MediaStreamTrack.getSources(function(sources) {
+          var source, item;
+          for (var i = 0, il = sources.length; i < il; i++) {
+            source = sources[i];
+            if (source.kind === 'audio') {
+              item = document.createElement('option');
+              item.value = source.id;
+              item.innerHTML = source.id + '';
+              microphones.appendChild(item);
+            }
+          }
         });
+
+        microphones.addEventListener('change', function (elem) {
+          var constraints = {}, id = elem.value;
+          constraints.audio = {
+            optional: [{ sourceId: id}]
+          };
+          navigator.getUserMedia(constraints, initRecorder, function(e) {
+            throw new Error('No live audio input: ' + e);
+          });
+        }, false);
+
+        // Init playback.
         initPlayer();
       }
 
       function initPlayer() {
-        playerGain = audioContext.createGain();
-        playerGain.connect(audioContext.destination);
-        playerGain.gain.value = 0.5;
-        player = new Player(playerGain);
+        player = new Player();
       }
 
       function initRecorder(stream) {
-        // Build audio graph
         var mediaStreamSource = audioContext.createMediaStreamSource(stream);
-        var monoStreamSource = convertToMono(mediaStreamSource);
-        recorderGain = audioContext.createGain();
-        monoStreamSource.connect(recorderGain);
-        recorderGain.connect(audioContext.destination);
-        recorderGain.gain.value = 0.5;
+        
+        // Build audio graph
+        if (!recorderGain) {
+          recorderGain = audioContext.createGain();
+          recorderGain.connect(audioContext.destination);
+          recorderGain.gain.value = 0.5;
+        }
+        if (inputStream) {
+          inputStream.disconnect();
+        }
+        inputStream = convertToMono(mediaStreamSource);
+        inputStream.connect(recorderGain);
+        if (recorder) {
+          recorder.disconnect();
+        }
         recorder = new Recorder(recorderGain);
         console.log('Recorder set up.');
       }
@@ -126,7 +155,7 @@
           recorder && recorder.stop();
           button.innerHTML = 'Record';
           console.log('Stopped recording.');
-          recorder.clear(function (result) {
+          recorder.save(function (result) {
             console.log(result);
             if (result === 'success') {
               updateList();

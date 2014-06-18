@@ -1,64 +1,67 @@
 (function () {
 
   var WORKER_PATH = 'recorderWorker.js';
+  var BUFFER_LENGTH = 4096; // number of samples to send at a time.
 
-  var Recorder = function (source, cfg) {
-    var config = cfg || {};
-    var bufferLen = config.bufferLen || 4096;
-    this.context = source.context;
-    this.node = (this.context.createScriptProcessor ||
-                 this.context.createJavaScriptNode).call(this.context,
-                                                         bufferLen, 1, 1);
+  function Recorder(source) {
+    var context = source.context;
+    var node = context.createScriptProcessor(BUFFER_LENGTH, 1, 1);
+    var worker = this.worker = new Worker(WORKER_PATH);
+    var self = this;
 
-    var worker = new Worker(config.workerPath || WORKER_PATH);
+    this.recording = false;
+    this.callback = null;
 
     worker.postMessage({
       command: 'init',
       config: {
-        sampleRate: this.context.sampleRate
+        sampleRate: context.sampleRate
       }
     });
 
-    var recording = false, callback = null;
+    worker.onmessage = function (e) {
+      var callback = self.callback;
+      if (callback) {
+        callback(e.data);
+        self.callback = null;
+      }
+    };
 
-    this.node.onaudioprocess = function(e){
-      if (!recording) return;
+    node.onaudioprocess = function (e) {
+      if (!self.recording) return;
       worker.postMessage({
         command: 'record',
         buffer: e.inputBuffer.getChannelData(0)
       });
     }
 
-    this.record = function(){
-      recording = true;
-    }
+    source.connect(node);
+    //node.connect(context.destination);
+  }
 
-    this.stop = function(){
-      recording = false;
-    }
+  Recorder.prototype.record = function () {
+    this.recording = true;
+  };
 
-    this.clear = function(cb){
-      callback = cb;
-      worker.postMessage({ command: 'clear' });
-    }
+  Recorder.prototype.stop = function () {
+    this.recording = false;
+  };
 
-    this.removeAll = function(list, cb){
-      callback = cb;
-      worker.postMessage({
-        command: 'removeAll',
-        list: list
-      });
-    }
+  Recorder.prototype.save = function (cb) {
+    this.callback = cb;
+    this.worker.postMessage({ command: 'save' });
+  };
 
-    worker.onmessage = function (e) {
-      if (callback) {
-        callback(e.data);
-        callback = null;
-      }
-    };
+  Recorder.prototype.clear = function(list, cb){
+    this.callback = cb;
+    this.worker.postMessage({
+      command: 'clear',
+      list: list
+    });
+  };
 
-    source.connect(this.node);
-    this.node.connect(this.context.destination);    //this should not be necessary
+  Recorder.prototype.disconnect = function () {
+    this.worker.postMessage({ command: 'disconnect' });
   };
 
   window.Recorder = Recorder;

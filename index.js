@@ -15,7 +15,6 @@ app.get('/', function (req, res) {
 
 app.get('/audio/:id', function (req, res) {
   var id = req.params.id;
-  res.type('audio/wave');
   res.sendfile(audioDir + id);
 });
 
@@ -33,7 +32,8 @@ app.get('/list', function (req, res) {
 app.post('/mix', function (req, res) {
   var args = req.body.mix || [];
   if (args.length < 2) {
-    res.redirect('/');
+    console.error('Invalid argument.');
+    res.json({result: 'failed'});
     return;
   }
 
@@ -45,9 +45,9 @@ app.post('/mix', function (req, res) {
 
   var spawn = require('child_process').spawn;
   var sox    = spawn('sox', args);
+  console.log('Executing SoX with args: ' + args);
   sox.on('close', function(code) {
-    console.log('[from sox] : child process exited with code ' + code);
-    //res.redirect(303, '/');
+    console.log('child process exited with code ' + code);
     if (code) {
       res.json({result: 'failed'});
     } else {
@@ -75,10 +75,9 @@ io.on('connection', function (socket) {
     console.log("Received 'flush' message");
     var wavFile = Buffer.concat([createWaveHeader(), buffer]);
     var fileName = audioDir + 'beketa-' + (fileId++) + '.wav';
-    //var err = fs.writeFileSync(fileName, wavFile, null);
     fs.writeFile(fileName, wavFile, null, function (err) {
       if (err) {
-        console.error(err);
+        console.error('An error occured in writing buffer');
         callback('error');
       } else {
         console.log("The file was saved as ", fileName);
@@ -86,7 +85,6 @@ io.on('connection', function (socket) {
         callback('success');
       }
     });
-    socket.emit('reuslt', {data: 'success'});
   });
   socket.on('delete', function (msg, callback) {
     console.log("Received 'delete' message");
