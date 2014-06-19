@@ -18,9 +18,14 @@ this.onmessage = function (e) {
 };
 
 function init(config) {
+  var tSelf = this;
+
   socket = io();
   socket.emit('metadata', {
     sampleRate:config.sampleRate 
+  });
+  socket.on('server', function (message) {
+    tSelf.postMessage(message);
   });
 }
 
@@ -40,16 +45,12 @@ function record(inputBuffer) {
 
 function save() {
   var tSelf = this;
-  socket.emit('flush', {}, function (result) {
-    tSelf.postMessage(result);
-  });
+  socket.emit('flush', {});
 }
 
 function clear(list) {
   var tSelf = this;
-  socket.emit('delete', {list: list}, function (result) {
-    tSelf.postMessage(result);
-  });
+  socket.emit('delete', {list: list});
 }
 
 function disconnect() {

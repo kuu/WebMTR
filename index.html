@@ -10,7 +10,9 @@
   </head>
   <body>
     <div>
-      <label>Available audio inputs:<select id="microphones" size="1"></select></label>
+      <label>Available audio inputs:<select id="microphones" size="1">
+        <option value="default" selected>Choose audio input.</option>
+      </select></label>
     </div>
     <div>
       <p><label>Volume (Recording) <input type="range" id="recordingVolume"></label></p>
@@ -25,7 +27,7 @@
     <script src="recorder.js"></script>
     <script src="player.js"></script>
     <script>
-      var audioContext, recorder, inputStream, recorderGain, player, list, recorderButton;
+      var audioContext, recorder, inputStream, recordingVolume, recorderGain, player, list, recorderButton;
 
       initGlobal();
       initDOM();
@@ -42,9 +44,9 @@
         recorderButton.addEventListener('click', function (e) {
           record(recorderButton);
         }, false);
-        var recordingVolume = document.getElementById('recordingVolume');
+        recordingVolume = document.getElementById('recordingVolume');
         recordingVolume.addEventListener('change', function () {
-          recorderGain.gain.value = recordingVolume.value * 2 / 100;
+          recorderGain.gain.value = recordingVolume.value / 100;
         }, false); 
         list = document.getElementById('list');
         updateList();
@@ -55,7 +57,7 @@
         var playButton = document.getElementById('play');
         playButton.addEventListener('click', function () {
           if (player) {
-            var items = getSelectedItem();
+            var items = getSelectedItems();
             playButton.disabled = true;
             player.update(items).then(function () {
               player.play(items);
@@ -68,14 +70,9 @@
         var deleteButton = document.getElementById('delete');
         deleteButton.addEventListener('click', function () {
           player && player.clear();
-          var items = getSelectedItem();
+          var items = getSelectedItems();
           if (recorder && items && items.length > 0) {
-            recorder.clear(items, function (result) {
-              console.log(result);
-              if (result === 'success') {
-                updateList();
-              }
-            });
+            recorder.clear(items);
           }
         }, false);
       }
@@ -106,7 +103,10 @@
         });
 
         microphones.addEventListener('change', function (elem) {
-          var constraints = {}, id = elem.value;
+          var constraints = {}, id = elem.target.selectedOptions[0].value;
+          if (id === 'default') {
+            return;
+          }
           constraints.audio = {
             optional: [{ sourceId: id}]
           };
@@ -131,6 +131,7 @@
           recorderGain = audioContext.createGain();
           recorderGain.connect(audioContext.destination);
           recorderGain.gain.value = 0.5;
+          recordingVolume.value = 50;
         }
         if (inputStream) {
           inputStream.disconnect();
@@ -140,13 +141,17 @@
         if (recorder) {
           recorder.disconnect();
         }
-        recorder = new Recorder(recorderGain);
+        recorder = new Recorder(recorderGain, function (obj) {
+          if (obj && obj.message === 'updateList') {
+            updateList();
+          }
+        });
         console.log('Recorder set up.');
       }
 
       function record(button) {
         if (button.innerHTML === 'Record') {
-          player && player.play(getSelectedItem());
+          player && player.play(getSelectedItems());
           recorder && recorder.record();
           button.innerHTML = 'Stop';
           console.log('Recording...');
@@ -155,12 +160,7 @@
           recorder && recorder.stop();
           button.innerHTML = 'Record';
           console.log('Stopped recording.');
-          recorder.save(function (result) {
-            console.log(result);
-            if (result === 'success') {
-              updateList();
-            }
-          });
+          recorder.save();
         }
       }
 
@@ -203,7 +203,7 @@
         xhr.send();
       }
 
-      function getSelectedItem() {
+      function getSelectedItems() {
         var tList = document.getElementsByName("item"), arr = [];
         for (var i = 0, il = tList.length; i < il; i++) {
           if (tList[i].checked) {
@@ -214,25 +214,11 @@
       }
 
       function doMix() {
-        function handler() {
-          if (this.readyState == this.DONE) {
-            if (this.status == 200 && this.response) {
-              var response = JSON.parse(this.response);
-              if (response.result === 'success') {
-                updateList();
-                return;
-              }
-            }
-            alert('Something bad happened in mixing.');
-          }
-        }
-
-        var arr = getSelectedItem();
+        var arr = getSelectedItems();
         if (arr.length < 2) {
           alert('Choose more than two items.');
         } else {
           var xhr = new XMLHttpRequest();
-          xhr.onreadystatechange = handler;
           xhr.open("POST", "/mix");
           xhr.setRequestHeader("Content-Type", "application/json");
           xhr.send(JSON.stringify({mix: arr}));

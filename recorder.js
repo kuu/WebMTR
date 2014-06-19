@@ -3,14 +3,13 @@
   var WORKER_PATH = 'recorderWorker.js';
   var BUFFER_LENGTH = 4096; // number of samples to send at a time.
 
-  function Recorder(source) {
+  function Recorder(source, callback) {
     var context = source.context;
     var node = context.createScriptProcessor(BUFFER_LENGTH, 1, 1);
     var worker = this.worker = new Worker(WORKER_PATH);
     var self = this;
 
     this.recording = false;
-    this.callback = null;
 
     worker.postMessage({
       command: 'init',
@@ -20,10 +19,8 @@
     });
 
     worker.onmessage = function (e) {
-      var callback = self.callback;
       if (callback) {
         callback(e.data);
-        self.callback = null;
       }
     };
 
@@ -47,13 +44,11 @@
     this.recording = false;
   };
 
-  Recorder.prototype.save = function (cb) {
-    this.callback = cb;
+  Recorder.prototype.save = function () {
     this.worker.postMessage({ command: 'save' });
   };
 
-  Recorder.prototype.clear = function(list, cb){
-    this.callback = cb;
+  Recorder.prototype.clear = function(list){
     this.worker.postMessage({
       command: 'clear',
       list: list

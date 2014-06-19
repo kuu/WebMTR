@@ -3,11 +3,11 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var fs = require('fs');
-var bodyParser = require('body-parser');
 var sampleRate, audioDir = './audio/', fileId = 0;
+var buffer = new Buffer(0);
 
 app.use(express.static(__dirname));
-app.use(bodyParser());
+app.use(require('body-parser')());
 
 app.get('/', function (req, res) {
   res.sendfile('index.html');
@@ -41,7 +41,7 @@ app.post('/mix', function (req, res) {
     args[i] = audioDir + args[i];
   }
   args.unshift('-m');
-  args.push(audioDir + 'beketa-' + (fileId++) + '.wav');
+  args.push(audioDir + 'track-' + (fileId++) + '.wav');
 
   var spawn = require('child_process').spawn;
   var sox    = spawn('sox', args);
@@ -52,11 +52,10 @@ app.post('/mix', function (req, res) {
       res.json({result: 'failed'});
     } else {
       res.json({result: 'success'});
+      io.emit('server', {message: 'updateList'});
     }
   });
 });
-
-var buffer = new Buffer(0);
 
 io.on('connection', function (socket) {
   console.log('a user connected');
@@ -71,31 +70,32 @@ io.on('connection', function (socket) {
     buffer = Buffer.concat([buffer, buf]);
     //console.log(buffer.length);
   });
-  socket.on('flush', function (msg, callback) {
+  socket.on('flush', function (msg) {
     console.log("Received 'flush' message");
     var wavFile = Buffer.concat([createWaveHeader(), buffer]);
-    var fileName = audioDir + 'beketa-' + (fileId++) + '.wav';
+    var fileName = audioDir + 'track-' + (fileId++) + '.wav';
     fs.writeFile(fileName, wavFile, null, function (err) {
       if (err) {
         console.error('An error occured in writing buffer');
-        callback('error');
       } else {
         console.log("The file was saved as ", fileName);
         buffer.length = 0;
-        callback('success');
+        io.emit('server', {message: 'updateList'});
       }
     });
   });
-  socket.on('delete', function (msg, callback) {
+  socket.on('delete', function (msg) {
     console.log("Received 'delete' message");
-    var list = msg.list, err, result = true;
+    var list = msg.list, err, success = true;
     for (var i = 0, il = list.length; i < il; i++) {
       err = fs.unlinkSync(audioDir + list[i]);
       if (err) {
-        result = false;
+        success = false;
       }
     }
-    callback(result ? 'success' : 'error');
+    if (success) {
+      io.emit('server', {message: 'updateList'});
+    }
   });
 });
 
