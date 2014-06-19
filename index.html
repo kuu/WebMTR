@@ -10,16 +10,25 @@
   </head>
   <body>
     <div>
-      <label>Available audio inputs:<select id="microphones" size="1">
-        <option value="default" selected>Choose audio input.</option>
-      </select></label>
+      <a href="#rec">Recorder</a>
+      <a href="#mix">Mixer</a>
     </div>
-    <div>
+    <div class="recorderTab">
+      <p>
+        <label>Available audio inputs:
+          <select id="microphones" size="1">
+            <option value="default" selected>Choose audio input.</option>
+          </select>
+        </label>
+      </p>
       <p><label>Volume (Recording) <input type="range" id="recordingVolume"></label></p>
+    </div>
+    <div id="list"></div>
+    <div class="recorderTab">
+      <p>Checked tracks are played back while recording.</p>
       <p><button id="recordBtn">Record</button></p>
     </div>
-    <div>
-      <div id="list"></div>
+    <div class="mixerTab">
       <button id="mix">Mix</button>
       <button id="play">Play</button>
       <button id="delete">Delete</button>
@@ -67,6 +76,7 @@
             });
           }
         }, false);
+
         var deleteButton = document.getElementById('delete');
         deleteButton.addEventListener('click', function () {
           player && player.clear();
@@ -75,6 +85,30 @@
             recorder.clear(items);
           }
         }, false);
+
+        var hashChanged = window.onhashchange = function (e) {
+          var url = e.newURL;
+          var idx = url.indexOf('#');
+          if (idx === -1) {
+            return;
+          }
+          var hash = url.substring(idx + 1);
+          var recorderDivs = document.getElementsByClassName('recorderTab');
+          var mixerDivs = document.getElementsByClassName('mixerTab');
+          var updateDisplay = function (divs, param) {
+            for (var i = 0, il = divs.length; i < il; i++) {
+              divs[i].style.display = param; 
+            }
+          };
+          if (hash === 'rec') {
+            updateDisplay(recorderDivs, 'block');
+            updateDisplay(mixerDivs, 'none');
+          } else {
+            updateDisplay(recorderDivs, 'none');
+            updateDisplay(mixerDivs, 'block');
+          }
+        };
+        hashChanged({newURL: '#rec'});
       }
 
       function initAudio() {
