@@ -33,7 +33,7 @@
     }
 
     source.connect(node);
-    //node.connect(context.destination);
+    node.connect(context.destination);
   }
 
   Recorder.prototype.record = function () {
