@@ -22,6 +22,7 @@
         </label>
       </p>
       <p><label>Volume (Recording) <input type="range" id="recordingVolume"></label></p>
+      <p><label>Volume (Monitor) <input type="range" id="monitorVolume"></label></p>
     </div>
     <div id="list"></div>
     <div class="recorderTab">
@@ -36,7 +37,7 @@
     <script src="recorder.js"></script>
     <script src="player.js"></script>
     <script>
-      var audioContext, recorder, inputStream, recordingVolume, recorderGain, player, list, recorderButton;
+      var audioContext, recorder, inputStream, recordingVolume, recorderGain, monitorGain, player, list, recorderButton;
 
       initGlobal();
       initDOM();
@@ -56,6 +57,10 @@
         recordingVolume = document.getElementById('recordingVolume');
         recordingVolume.addEventListener('change', function () {
           recorderGain.gain.value = recordingVolume.value / 100;
+        }, false); 
+        monitorVolume = document.getElementById('monitorVolume');
+        monitorVolume.addEventListener('change', function () {
+          monitorGain.gain.value = monitorVolume.value / 100;
         }, false); 
         list = document.getElementById('list');
         updateList();
@@ -163,9 +168,14 @@
         // Build audio graph
         if (!recorderGain) {
           recorderGain = audioContext.createGain();
-          recorderGain.connect(audioContext.destination);
           recorderGain.gain.value = 0.5;
           recordingVolume.value = 50;
+        }
+        if (!monitorGain) {
+          monitorGain = audioContext.createGain();
+          monitorGain.connect(audioContext.destination);
+          monitorGain.gain.value = 0.5;
+          monitorVolume.value = 50;
         }
         if (inputStream) {
           inputStream.disconnect();
@@ -175,6 +185,7 @@
         if (recorder) {
           recorder.disconnect();
         }
+        inputStream.connect(monitorGain);
         recorder = new Recorder(recorderGain, function (obj) {
           if (obj && obj.message === 'updateList') {
             updateList();
