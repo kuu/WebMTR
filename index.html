@@ -27,7 +27,7 @@
     <div id="list"></div>
     <div class="recorderTab">
       <p>Checked tracks are played back while recording.</p>
-      <p><button id="recordBtn">Record</button></p>
+      <p><button id="recordBtn" disabled>Record</button></p>
     </div>
     <div class="mixerTab">
       <button id="mix">Mix</button>
@@ -56,11 +56,15 @@
         }, false);
         recordingVolume = document.getElementById('recordingVolume');
         recordingVolume.addEventListener('change', function () {
-          recorderGain.gain.value = recordingVolume.value / 100;
+          if (recorderGain) {
+            recorderGain.gain.value = recordingVolume.value / 100;
+          }
         }, false); 
         monitorVolume = document.getElementById('monitorVolume');
         monitorVolume.addEventListener('change', function () {
-          monitorGain.gain.value = monitorVolume.value / 100;
+          if (monitorGain) {
+            monitorGain.gain.value = monitorVolume.value / 100;
+          }
         }, false); 
         list = document.getElementById('list');
         updateList();
@@ -188,6 +192,7 @@
             updateList();
           }
         });
+        recorderButton.disabled = false;
         console.log('Recorder set up.');
       }
 
