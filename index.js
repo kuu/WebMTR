@@ -9,6 +9,15 @@ var buffer = new Buffer(0);
 app.use(express.static(__dirname));
 app.use(require('body-parser')());
 
+if (!fs.existsSync(audioDir)) {
+  try {
+    fs.mkdirSync(audioDir);
+  } catch (e) {
+    console.error('Unable to create "audio" dir. Exit.');
+    return;
+  }
+}
+
 app.get('/', function (req, res) {
   res.sendfile('index.html');
 });
@@ -57,6 +66,31 @@ app.post('/mix', function (req, res) {
   });
 });
 
+app.post('/delete', function (req, res) {
+  var args = req.body.list || [], success = true;
+
+  if (args.length === 0) {
+    console.error('Invalid argument.');
+    res.json({result: 'failed'});
+    return;
+  }
+
+  for (var i = 0, il = args.length; i < il; i++) {
+    err = fs.unlinkSync(audioDir + args[i]);
+    if (err) {
+      success = false;
+    }
+  }
+
+  if (success) {
+    res.json({result: 'success'});
+    io.emit('server', {message: 'updateList'});
+    console.log('File deleted: ', args);
+  } else {
+    res.json({result: 'failed'});
+  }
+});
+
 io.on('connection', function (socket) {
   console.log('a user connected');
   socket.on('disconnect', function () {
@@ -83,19 +117,6 @@ io.on('connection', function (socket) {
         io.emit('server', {message: 'updateList'});
       }
     });
-  });
-  socket.on('delete', function (msg) {
-    console.log("Received 'delete' message");
-    var list = msg.list, err, success = true;
-    for (var i = 0, il = list.length; i < il; i++) {
-      err = fs.unlinkSync(audioDir + list[i]);
-      if (err) {
-        success = false;
-      }
-    }
-    if (success) {
-      io.emit('server', {message: 'updateList'});
-    }
   });
 });
 

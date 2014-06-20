@@ -48,13 +48,6 @@
     this.worker.postMessage({ command: 'save' });
   };
 
-  Recorder.prototype.clear = function(list){
-    this.worker.postMessage({
-      command: 'clear',
-      list: list
-    });
-  };
-
   Recorder.prototype.disconnect = function () {
     this.worker.postMessage({ command: 'disconnect' });
   };

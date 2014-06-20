@@ -85,10 +85,7 @@
         var deleteButton = document.getElementById('delete');
         deleteButton.addEventListener('click', function () {
           player && player.clear();
-          var items = getSelectedItems();
-          if (recorder && items && items.length > 0) {
-            recorder.clear(items);
-          }
+          doClear();
         }, false);
 
         var hashChanged = window.onhashchange = function (e) {
@@ -267,6 +264,18 @@
           xhr.open("POST", "/mix");
           xhr.setRequestHeader("Content-Type", "application/json");
           xhr.send(JSON.stringify({mix: arr}));
+        }
+      }
+
+      function doClear() {
+        var arr = getSelectedItems();
+        if (arr.length === 0) {
+          alert('Choose item.');
+        } else {
+          var xhr = new XMLHttpRequest();
+          xhr.open("POST", "/delete");
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.send(JSON.stringify({list: arr}));
         }
       }
     </script>

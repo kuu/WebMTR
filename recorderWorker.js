@@ -10,8 +10,6 @@ this.onmessage = function (e) {
     record(e.data.buffer);
   } else if (command === 'save') {
     save();
-  } else if (command === 'clear') {
-    clear(e.data.list);
   } else if (command === 'disconnect') {
     disconnect();
   }
@@ -46,11 +44,6 @@ function record(inputBuffer) {
 function save() {
   var tSelf = this;
   socket.emit('flush', {});
-}
-
-function clear(list) {
-  var tSelf = this;
-  socket.emit('delete', {list: list});
 }
 
 function disconnect() {
