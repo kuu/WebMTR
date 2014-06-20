@@ -37,6 +37,7 @@
   }
 
   Recorder.prototype.record = function () {
+    this.worker.postMessage({ command: 'start' });
     this.recording = true;
   };
 

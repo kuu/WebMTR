@@ -6,6 +6,8 @@ this.onmessage = function (e) {
   var command = e.data.command;
   if (command === 'init') {
     init(e.data.config);
+  } else if (command === 'start') {
+    start();
   } else if (command === 'record') {
     record(e.data.buffer);
   } else if (command === 'save') {
@@ -25,6 +27,10 @@ function init(config) {
   socket.on('server', function (message) {
     tSelf.postMessage(message);
   });
+}
+
+function start() {
+  socket.emit('start', {});
 }
 
 function record(inputBuffer) {

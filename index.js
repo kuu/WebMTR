@@ -4,7 +4,7 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var fs = require('fs');
 var sampleRate, audioDir = './audio/', fileId = 0;
-var buffer = new Buffer(0);
+var buffer = null;
 
 app.use(express.static(__dirname));
 app.use(require('body-parser')());
@@ -99,6 +99,9 @@ io.on('connection', function (socket) {
   socket.on('metadata', function (msg) {
     sampleRate = msg.sampleRate;
   });
+  socket.on('start', function () {
+    buffer = new Buffer(0);
+  });
   socket.on('record', function (msg) {
     var buf = msg.data;
     buffer = Buffer.concat([buffer, buf]);
@@ -113,7 +116,7 @@ io.on('connection', function (socket) {
         console.error('An error occured in writing buffer');
       } else {
         console.log("The file was saved as ", fileName);
-        buffer.length = 0;
+        //buffer.length = 0;
         io.emit('server', {message: 'updateList'});
       }
     });
