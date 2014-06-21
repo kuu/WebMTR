@@ -1,15 +1,13 @@
 (function () {
 
-  var WORKER_PATH = 'recorderWorker.js';
-  var BUFFER_LENGTH = 4096; // number of samples to send at a time.
+  var worker, recording = false;
 
   function Recorder(source, callback) {
     var context = source.context;
-    var node = context.createScriptProcessor(BUFFER_LENGTH, 1, 1);
-    var worker = this.worker = new Worker(WORKER_PATH);
-    var self = this;
+    var node = context.createScriptProcessor(4096, 1, 1);
+    worker = new Worker('recorderWorker.js');
 
-    this.recording = false;
+    recording = false;
 
     worker.postMessage({
       command: 'init',
@@ -25,7 +23,7 @@
     };
 
     node.onaudioprocess = function (e) {
-      if (!self.recording) return;
+      if (!recording) return;
       worker.postMessage({
         command: 'record',
         buffer: e.inputBuffer.getChannelData(0)
@@ -37,20 +35,20 @@
   }
 
   Recorder.prototype.record = function () {
-    this.worker.postMessage({ command: 'start' });
-    this.recording = true;
+    worker.postMessage({ command: 'start' });
+    recording = true;
   };
 
   Recorder.prototype.stop = function () {
-    this.recording = false;
+    recording = false;
   };
 
   Recorder.prototype.save = function () {
-    this.worker.postMessage({ command: 'save' });
+    worker.postMessage({ command: 'save' });
   };
 
   Recorder.prototype.disconnect = function () {
-    this.worker.postMessage({ command: 'disconnect' });
+    worker.postMessage({ command: 'disconnect' });
   };
 
   window.Recorder = Recorder;
