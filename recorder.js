@@ -1,10 +1,14 @@
+// ScriptProcessorNode needs to be seved in a global variable due to the following bug:
+// http://stackoverflow.com/questions/24338144/chrome-onaudioprocess-stops-getting-called-after-a-while
+var scriptProcessorNode;
+
 (function () {
 
   var worker, recording = false;
 
   function Recorder(source, callback) {
     var context = source.context;
-    var node = context.createScriptProcessor(4096, 1, 1);
+    scriptProcessorNode = context.createScriptProcessor(4096, 1, 1);
     worker = new Worker('recorderWorker.js');
 
     recording = false;
@@ -22,7 +26,7 @@
       }
     };
 
-    node.onaudioprocess = function (e) {
+    scriptProcessorNode.onaudioprocess = function (e) {
       if (!recording) return;
       worker.postMessage({
         command: 'record',
@@ -30,8 +34,8 @@
       });
     }
 
-    source.connect(node);
-    node.connect(context.destination);
+    source.connect(scriptProcessorNode);
+    scriptProcessorNode.connect(context.destination);
   }
 
   Recorder.prototype.record = function () {
