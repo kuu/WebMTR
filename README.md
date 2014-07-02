@@ -11,3 +11,11 @@ Playing around Socket.IO's binary support.
 2. Node
  * Receive each data as a Buffer object.
  * Concat them into a WAVE file.
+
+## How to run:
+ * Install [node](http://nodejs.org/) and [sox](http://sox.sourceforge.net/).
+ * $ git clone git@github.com:kuu/WebMTR.git
+ * $ cd WebMTR
+ * $ npm install
+ * $ node index.js
+ * Access port 3000 with Chrome.
