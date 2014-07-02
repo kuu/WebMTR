@@ -4,14 +4,18 @@
     <title>Socket.IO audio recording demo</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font: 13px Helvetica, Arial; }
+      body {
+        font-family: amplitude;
+        font-size: 18px;
+        letter-spacing: 3px;
+      }
       button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
     </style>
   </head>
   <body>
     <div>
       <a href="#rec">Recorder</a>
-      <a href="#mix">Mixer</a>
+      <a id="mixerAnchor" href="javascript:alert('Choose audio input source.')">Mixer</a>
     </div>
     <div class="recorderTab">
       <p>
@@ -21,15 +25,15 @@
           </select>
         </label>
       </p>
+    </div>
+    <div id="list">No track available.</div>
+    <div class="recorderTab">
       <p><label>Volume (Recording) <input type="range" id="recordingVolume"></label></p>
       <p><label>Volume (Monitor) <input type="range" id="monitorVolume"></label></p>
-    </div>
-    <div id="list"></div>
-    <div class="recorderTab">
-      <p>Checked tracks are played back while recording.</p>
       <p><button id="recordBtn" disabled>Record</button></p>
     </div>
     <div class="mixerTab">
+      <p><label>Volume (Playback) <input type="range" id="playbackVolume"></label></p>
       <button id="mix">Mix</button>
       <button id="play">Play</button>
       <button id="delete">Delete</button>
@@ -37,7 +41,12 @@
     <script src="recorder.js"></script>
     <script src="player.js"></script>
     <script>
-      var audioContext, recorder, inputStream, recordingVolume, recorderGain, monitorGain, player, list, recorderButton;
+      'use strict';
+
+      var recorder, player, list;
+      var recordingVolume, monitorVolume, playbackVolume;
+      var audioContext, inputStream, recorderGain, monitorGain;
+      var recordButton, mixButton, playButton, deleteButton;
 
       initGlobal();
       initDOM();
@@ -50,9 +59,9 @@
       }
 
       function initDOM() {
-        recorderButton = document.getElementById('recordBtn');
-        recorderButton.addEventListener('click', function (e) {
-          record(recorderButton);
+        recordButton = document.getElementById('recordBtn');
+        recordButton.addEventListener('click', function (e) {
+          record(recordButton);
         }, false);
         recordingVolume = document.getElementById('recordingVolume');
         recordingVolume.addEventListener('change', function () {
@@ -68,27 +77,22 @@
         }, false); 
         list = document.getElementById('list');
         updateList();
-        var mixButton = document.getElementById('mix');
+        playbackVolume = document.getElementById('playbackVolume');
+        playbackVolume.addEventListener('change', function () {
+          player.setVolume(playbackVolume.value / 100);
+        }, false); 
+        mixButton = document.getElementById('mix');
         mixButton.addEventListener('click', function () {
           doMix();
         }, false);
-        var playButton = document.getElementById('play');
+        playButton = document.getElementById('play');
         playButton.addEventListener('click', function () {
-          if (player) {
-            var items = getSelectedItems();
-            playButton.disabled = true;
-            player.update(items).then(function () {
-              player.play(items);
-              playButton.disabled = false;
-            }, function () {
-              playButton.disabled = false;
-            });
-          }
+          play(playButton);
         }, false);
 
-        var deleteButton = document.getElementById('delete');
+        deleteButton = document.getElementById('delete');
         deleteButton.addEventListener('click', function () {
-          player && player.clear();
+          player.clear();
           doClear();
         }, false);
 
@@ -161,6 +165,8 @@
 
       function initPlayer() {
         player = new Player();
+        player.setVolume(0.5);
+        playbackVolume.value = 50;
       }
 
       function initRecorder(stream) {
@@ -192,22 +198,50 @@
             updateList();
           }
         });
-        recorderButton.disabled = false;
+        recordButton.disabled = false;
+        var mixerAnchor = document.getElementById('mixerAnchor');
+        mixerAnchor.href = '#mix';
         console.log('Recorder set up.');
       }
 
       function record(button) {
         if (button.innerHTML === 'Record') {
-          player && player.play(getSelectedItems());
+          player.play(getSelectedItems());
           recorder && recorder.record();
           button.innerHTML = 'Stop';
           console.log('Recording...');
         } else {
-          player && player.stop();
+          player.stop();
           recorder && recorder.stop();
           button.innerHTML = 'Record';
           console.log('Stopped recording.');
           recorder.save();
+        }
+      }
+
+      function setPlaybackMode(playback) {
+        playButton.textContent = playback ? 'Stop' : 'Play';
+        mixButton.disabled = playback;
+        deleteButton.disabled = playback;
+      }
+
+      function play(button) {
+        var items;
+
+        if (button.innerHTML === 'Play') {
+          items = getSelectedItems();
+          player.update(items).then(function () {
+            return player.play(items);
+          }).then(function () {
+              setPlaybackMode(false);
+            },
+            function () {
+              setPlaybackMode(false);
+          });
+          setPlaybackMode(true);
+        } else {
+          player.stop();
+          setPlaybackMode(false);
         }
       }
 
@@ -233,13 +267,14 @@
                 value = arr[i];
                 str += '<label><input type="checkbox" name="item" value="' + value + '">' + value + '</label><br>';
               }
-              list.innerHTML = str;
+              list.innerHTML = str || 'No track available.';
               player.update(arr).then(function () {
-                recorderButton.disable = false;
+                recordButton.disable = false;
+                playbackVolume.value = 50;
               }, function () {
-                recorderButton.disable = false;
+                recordButton.disable = false;
               });
-              recorderButton.disable = true;
+              recordButton.disable = true;
             }
           }
         }
@@ -263,7 +298,7 @@
       function doMix() {
         var arr = getSelectedItems();
         if (arr.length < 2) {
-          alert('Choose more than two items.');
+          alert('Choose more than two tracks to mix.');
         } else {
           var xhr = new XMLHttpRequest();
           xhr.open("POST", "/mix");
@@ -275,7 +310,7 @@
       function doClear() {
         var arr = getSelectedItems();
         if (arr.length === 0) {
-          alert('Choose item.');
+          alert('Choose tracks to delete.');
         } else {
           var xhr = new XMLHttpRequest();
           xhr.open("POST", "/delete");
